@@ -5,3 +5,7 @@ Despite the outpouring of social support posted to social media channels in the 
 
 The project contains three files:
       1)CollectData: Use to collect Data from 4 different sources:
+         -TrecIS 2018-2019-2020A 
+         -CrisiNLP 
+         -NGO(5 Top Accounts) 
+         -Random Trec IS Data
