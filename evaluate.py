@@ -226,7 +226,7 @@ def main():
     if label_spreading==True:
         print("Start Loading Word Embedding ")
         print(api.load('glove-twitter-200', return_path=True))
-        path = os.path.join(base_dir, 'glove-twitter-100', 'glove-twitter-100.gz')
+        path = os.path.join(base_dir, 'glove-twitter-200', 'glove-twitter-200.gz')
         model_gensim = KeyedVectors.load_word2vec_format(path)
         wvs = model_gensim.wv
         vectorizer = TfidfVectorizer(
