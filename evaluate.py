@@ -46,8 +46,11 @@ def get_sample_category(event_type):
         return 'natural'
     elif "bombing" in event_type or "shooting" in event_type or "explosion" in event_type or "collapse" in event_type:
         return "manmade"
-    else:
+    elif "general" in event_type:
         return "general"
+    elif "random" in event_type:
+        return 'random'
+
 
 
 def get_sample_weight(event_type, target):
@@ -56,10 +59,12 @@ def get_sample_weight(event_type, target):
         return 10
     elif get_sample_category(event_type) == get_sample_category(target):
         return 6
-    elif get_sample_category(event_type)=='general' or get_sample_category(event_type)=='top-accounts':
+    elif get_sample_category(event_type)=='random':
         return 1
-    else:
+    elif get_sample_category(event_type) == 'general':
         return 3
+    else:
+        return 5
 
 
 def get_sample_data(data, seed_number, label_spreading=False):
