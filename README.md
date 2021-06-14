@@ -24,7 +24,7 @@ The project contains three main files:
                   
   2)Analyze-data: 
   
-    This file contains all functions necassry for analyzing data. Firts, it apply commonpre processing techniques on tweet's text including removing stopwords,lemmatization,         lowercase, removing speciall characters and tokenize it. We  save the processed data in a separate column as "processed_text" to use in future 
+    This file contains all functions necessary for analyzing data. Firts, it apply commonpre processing techniques on tweet's text including removing stopwords,lemmatization,         lowercase, removing speciall characters and tokenize it. We  save the processed data in a separate column as "processed_text" to use in future 
     for either simple tfidf or word embedding. Second , it contains a LDA topic modeling.  Third, it contains sentence-bert embedding for generating similarity matrix for           assiging weights to different sampples duringn training. Finally, It cnntains call to classification pipleline that trains and evaluate different sampling strtategies.
   
                 
