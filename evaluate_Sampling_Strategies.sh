@@ -39,8 +39,10 @@ do
         --seed_number=$SEED \
         --sampling_strategy=$SAMPLING_STRATEGY \
         --up_weighting=0 \
-        --label_spreading=0  \
+        --label_prop=0  \
         --groupby_col=$GROUP_BY >> $SAMPLING_STRATEGY.sbatch
+        --random_sample=1
+        --threshhold=0
     done
   done
 
@@ -67,8 +69,10 @@ do
         --seed_number=$SEED \
         --sampling_strategy=$SAMPLING_STRATEGY \
         --up_weighting=1 \
-        --label_spreading=0  \
-        --groupby_col=$GROUP_BY >> $SAMPLING_STRATEGY.weighted.sbatch
+        --label_prop=0  \
+        --groupby_col=$GROUP_BY >> $SAMPLING_STRATEGY.sbatch
+        --random_sample=1
+        --threshhold=0
     done
   done
 

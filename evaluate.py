@@ -21,12 +21,17 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.semi_supervised import LabelSpreading, LabelPropagation
 from tqdm import tqdm
-
+from sklearn.metrics import plot_confusion_matrix
 import os
 from gensim.models import KeyedVectors
 from gensim.downloader import base_dir
 
 import gensim.downloader as api
+class Label_Prop_Approach(enum.Enum):
+   none = 0
+   all_volunteer = 1
+   label_spreading = 2
+   semi_supervised = 3
 
 pipeline_sgd = Pipeline([
     ('vect', CountVectorizer()),
@@ -67,13 +72,48 @@ def get_sample_weight(event_type, target):
         return 5
 
 
-def get_sample_data(data, seed_number, label_spreading=False):
-    labeled_data = data.query("src == 'trec' or src == 'crisis_nlp'")
-    other = data.query("src != 'trec' and src != 'crisis_nlp'")
-    N = len(labeled_data)
-    sample_data = labeled_data.sample(n=N, random_state=seed_number, replace=True)
-    sample_data = sample_data.append(other)
-    if label_spreading == True:
+def get_climate_related(event_type):
+    if 'hurricane/typhoon/cyclone/tornado' in event_type:
+        return 1
+    elif 'flood' in event_type:
+        return 1
+    elif 'wildfire/bushfire' in event_type:
+        return 1
+    else:
+        return 0
+
+
+
+def get_sample_climate_weight(event_type, target):
+
+    if event_type == target:
+        return 10
+    elif get_climate_related(event_type) == 1 :
+        return 6
+    elif get_sample_category(event_type)=='natural':
+        return 3
+    else:
+        return 1
+
+def get_sample_climate_weight_similariy(event_type, target):
+    if event_type == target:
+        return 10
+    if event_type in similarity_matrix.index:
+        return similarity_matrix.loc[target][event_type]*10
+    else:
+        return 1
+
+def get_sample_data(data, seed_number, label_prop_approach,threshhold,random_sample=True):
+
+    if random_sample == True:
+        labeled_data = data.query("src == 'trec' or src == 'crisis_nlp'")
+        other = data.query("src != 'trec' and src != 'crisis_nlp'")
+        N = len(labeled_data)
+        sample_data = labeled_data.sample(n=N, random_state=seed_number, replace=True)
+        sample_data = sample_data.append(other)
+    else:
+        sample_data=data
+    if label_prop_approach == Label_Prop_Approach.label_spreading.value :
         sample_data['ft_features'] = [vectorize(str(s)) for s in sample_data["processed_text"]]
         sample_data['l'] = sample_data.apply(lambda row: row['ft_features'].size, axis=1)
         sample_data = sample_data.query("l >1")
@@ -87,11 +127,37 @@ def get_sample_data(data, seed_number, label_spreading=False):
         sample_data["label_spread"] = y_learned
         sample_data = sample_data.query(
             "src == 'trec' or src=='crisis_nlp' or ((src=='top-accounts' or src=='random') and label_spread==1 )")
+    if label_prop_approach == Label_Prop_Approach.semi_supervised.value:
+        sample_data['ft_features'] = [vectorize(str(s)) for s in data["processed_text"]]
+        sample_data['l'] = data.apply(lambda row: row['ft_features'].size, axis=1)
+        sample_data = data.query("l >1")
+        sample_data.drop(columns=['l'], inplace=True)
+
+        training = sample_data.query("src == 'trec' or src == 'crisis_nlp'")
+        test = sample_data.query("src != 'trec' and src != 'crisis_nlp'")
+        vol = training.loc[training['label'] == 1]
+        non_vol = training.loc[training['label'] == 0]
+        training_up = non_vol.append(vol.sample(n=len(non_vol), replace=True), ignore_index=True)
+
+        X_train = training_up['ft_features']
+        X_test = test['ft_features']
+        y_train = training_up['label']
+        pipeline_lr = Pipeline([
+            ('nb', SGDClassifier(loss='log')),
+            ])
+        model = pipeline_lr.fit(X_train.tolist(), y_train)
+        test['label_prob'] = model.predict_proba(X_test.tolist())[:, 1]
+        test = test.loc[test['label_prob'] >= threshhold]
+
+        test.drop(columns=['label_prob'], inplace=True)
+        test['label'] = 1
+        sample_data = training.append(test)
+
     return sample_data
 
-def evaluate_model(data, heldout_event,groupby_col, sampling_strategy, up_weighting, seed_number, label_spreading=False):
+def evaluate_model(data, heldout_event,groupby_col, sampling_strategy, up_weighting, seed_number, label_prop_approach,random_sample=True,threshhold=0.5):
     # Decide with field to use for training as a gold-label
-    if label_spreading == True:
+    if label_prop_approach == Label_Prop_Approach.label_spreading.value:
         lab = 'label_spread'
     else:
         lab = 'label'
@@ -99,8 +165,8 @@ def evaluate_model(data, heldout_event,groupby_col, sampling_strategy, up_weight
     # Split Test and trainig data based on heldout_event/heldout_eventType  and get the resample training data
     main_training = data[data[groupby_col] != heldout_event]
     test = data[data[groupby_col] == heldout_event]
+    training = get_sample_data(main_training, seed_number, label_prop_approach,threshhold,random_sample=random_sample)
 
-    training = get_sample_data(main_training, seed_number, label_spreading)
 
     # Randomely give weights to each sample,then set higher weights to event of same-type
     if up_weighting == True:
@@ -131,7 +197,12 @@ def evaluate_model(data, heldout_event,groupby_col, sampling_strategy, up_weight
         training = non_vol.append(vol.sample(n=len(non_vol), weights='sample_weight', replace=True), ignore_index=True)
     # when up-sampling, resample primarily from events of the same “kind” of event (manmade vs. natural)
     elif sampling_strategy == "up-with-same-eventCategory":
-        training['sample_weight'] = [get_sample_weight(x, test.iloc[0].event_type) for x in training['event_type']]
+        training['sample_weight'] = [get_sample_climate_weight(x, test.iloc[0].event_type) for x in training['event_type']]
+        vol = training.loc[training[lab] == 1]
+        non_vol = training.loc[training[lab] == 0]
+        training = non_vol.append(vol.sample(n=len(non_vol), weights='sample_weight', replace=True), ignore_index=True)
+    elif sampling_strategy == "up-with-similarity-eventCategory":
+        training['sample_weight'] = [get_sample_climate_weight_similariy(x, test.iloc[0].event_type,) for x in training['event_type']]
         vol = training.loc[training[lab] == 1]
         non_vol = training.loc[training[lab] == 0]
         training = non_vol.append(vol.sample(n=len(non_vol), weights='sample_weight', replace=True), ignore_index=True)
@@ -152,7 +223,6 @@ def evaluate_model(data, heldout_event,groupby_col, sampling_strategy, up_weight
     f1_score = f1_score(y_test, y_predict, zero_division=0)
     return {groupby_col: test.iloc[0].eventid + '-' + str(seed_number), 'src': test.iloc[0].src, 'precision': precision,
             'recall': recall, 'f1_score': f1_score}
-
 
 
 def get_different_sampling_strategy(data,seed,heldout_event):
@@ -205,10 +275,15 @@ def read_parameters():
                         help="Specify the balancing strategies ")
     parser.add_argument("--up_weighting", type=int,  default=0,
                         help="Specify wheter to add more weight to sample fo the same event_type as heldout_event ")
-    parser.add_argument("--label_spreading", type=int, default=0,
+    parser.add_argument("--label_prop", type=int, default=0,
                         help="Specify to apply label spreading or not")
     parser.add_argument("--groupby_col", type=str, default='eventid',
                         help="Could be either eventid or eventtype for generating held-out event accordingly ")
+    parser.add_argument("--random_sample", type=int, default=1,
+                        help="Specify to use random sample of data using seed number or all the training ")
+    parser.add_argument("--threshhold", type=float, default=1,
+                        help="Specify to use random sample of data using seed number or all the training ")
+
 
     return parser
 
@@ -218,6 +293,7 @@ def main():
     global analyzer
     global wvs
     global vectorizer
+    global similarity_matrix
     parser = read_parameters()
     args = parser.parse_args()
     inputpath=args.inputpath
@@ -226,12 +302,21 @@ def main():
     seed_number = args.seed_number
     sampling_strategy = args.sampling_strategy
     up_weighting = False if args.up_weighting==0 else True
-    label_spreading =False if args.label_spreading==0 else True
+    label_prop=args.label_prop
+    # random_sampling = False if args.up_weighting == 0 else True
+    random_sampling=True
+    threshhold = args.threshhold
     groupby_col=args.groupby_col
-    if label_spreading==True:
+
+    if sampling_strategy == "up-with-similarity-eventCategory":
+        similarity_matrix=pd.read_csv("./event_ranks.csv")
+        similarity_matrix=similarity_matrix.rename(columns={"reference-event":'event'})
+        similarity_matrix=similarity_matrix.set_index("event")
+
+    if label_prop==Label_Prop_Approach.label_spreading.value or label_prop==Label_Prop_Approach.semi_supervised.value:
         print("Start Loading Word Embedding ")
-        print(api.load('glove-twitter-200', return_path=True))
-        path = os.path.join(base_dir, 'glove-twitter-200', 'glove-twitter-200.gz')
+        # print(api.load('fasttext-wiki-news-subwords-300', return_path=True))
+        path = os.path.join(base_dir, 'fasttext-wiki-news-subwords-300', 'fasttext-wiki-news-subwords-300.gz')
         model_gensim = KeyedVectors.load_word2vec_format(path)
         wvs = model_gensim.wv
         vectorizer = TfidfVectorizer(
@@ -246,10 +331,10 @@ def main():
         analyzer = vectorizer.build_analyzer()
         print("End Loading Word Embedding ")
 
-    print(f"Start evanulating model for sampling strategy: {sampling_strategy} with up-weighting={up_weighting}  and  label spreading={label_spreading} on {heldout_event} with seed number {seed_number}")
+    print(f"Start evanulating model for sampling strategy: {sampling_strategy} with up-weighting={up_weighting}  and  label spreading={Label_Prop_Approach(label_prop).name} on {heldout_event} with seed number {seed_number}")
     data=read_file(inputpath)
-    result=evaluate_model(data,heldout_event=heldout_event,groupby_col=groupby_col,sampling_strategy=sampling_strategy,up_weighting=up_weighting,seed_number=seed_number,label_spreading=label_spreading)
-    print(f"finish evanulating model for sampling strategy: {sampling_strategy} with up-weighting={up_weighting}  and  label spreading={label_spreading} on {heldout_event} with seed number {seed_number}")
+    result=evaluate_model(data,heldout_event=heldout_event,groupby_col=groupby_col,sampling_strategy=sampling_strategy,up_weighting=up_weighting,seed_number=seed_number,label_prop_approach=label_prop,threshhold=threshhold ,random_sample=random_sampling)
+    print(f"finish evanulating model for sampling strategy: {sampling_strategy} with up-weighting={up_weighting}  and  label spreading={Label_Prop_Approach(label_prop).name} on {heldout_event} with seed number {seed_number}")
 
     result_file = open(outputpath, "a+", encoding='utf-8')
     result_file.write(json.dumps(result) + '\n')
