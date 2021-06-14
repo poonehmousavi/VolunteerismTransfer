@@ -24,8 +24,7 @@ The project contains three main files:
                   
   2)Analyze-data: 
   
-    This file contains all functions necessary for analyzing data. Firts, it apply commonpre processing techniques on tweet's text including removing stopwords,lemmatization,         lowercase, removing speciall characters and tokenize it. We  save the processed data in a separate column as "processed_text" to use in future 
-    for either simple tfidf or word embedding. Second , it contains a LDA topic modeling.  Third, it contains sentence-bert embedding for generating similarity matrix for           assiging weights to different sampples duringn training. Finally, It cnntains call to classification pipleline that trains and evaluate different sampling strtategies.
+    This file contains all functions necessary for analyzing data. First, it applies common processing techniques to a tweet's text including removing stopwords, lemmatization,     lowercase, removing special characters, and tokenize it. We save the processed data in a separate column as "processed_text" to use in the future for either simple tfidf or     word embedding. Second, it contains an LDA topic modeling.  Third, it contains sentence-bert embedding for generating a similarity matrix for assigning weights to different     samples during training. Finally, It contains a call to classification pipeline that trains and evaluates different sampling strategies.
   
                 
   
@@ -40,7 +39,6 @@ The project contains three main files:
                         -"down": downsampling
                         -'up-with-same-eventtype':  when up-sampling, resample primarily from events of the same type
                         -'up-with-same-eventCategory': same event-type with the highest weight, data of the same “kind” of event (manmade vs. natural) weighted~6, and annotated data of other “kinds” of events weighted ~3)
-                        -up-with-similarity-eventCategory: assign weights according to similarity matrix
+                        -up-with-similarity-eventCategory: when up-sampling, assign weights according to the similarity matrix
 
-                -up_weighting:could be true or false. It could be true for sampling_strategy : "none","up" and "down".If true, it is up-weighting samples from the same event type as the held-out event ( Directly re-weight samples)
-   At the end , it generates the proper file name according to the parameters. Also, it is worth mentioning that the result only contains CrisisNLP and TREC IS       data.
+                -up_weighting:could be true or false. It could be true for sampling_strategy : "none","up" and "down".If true, it is up-weighting samples from the same event       data.
