@@ -22,9 +22,7 @@ The project contains three main files:
                  -Random+Labeled Data
                  -NGO+Random+Labeled Data
                   
-  2)Analyze-data: 
-  
-    This file contains all functions necessary for analyzing data. First, it applies common processing techniques to a tweet's text including removing stopwords, lemmatization,     lowercase, removing special characters, and tokenize it. We save the processed data in a separate column as "processed_text" to use in the future for either simple tfidf or     word embedding. Second, it contains an LDA topic modeling.  Third, it contains sentence-bert embedding for generating a similarity matrix for assigning weights to different     samples during training. Finally, It contains a call to classification pipeline that trains and evaluates different sampling strategies.
+  2)Analyze-data: This file contains all functions necessary for analyzing data. First, it applies common processing techniques to a tweet's text including removing stopwords, lemmatization,     lowercase, removing special characters, and tokenize it. We save the processed data in a separate column as "processed_text" to use in the future for either simple tfidf or     word embedding. Second, it contains an LDA topic modeling.  Third, it contains sentence-bert embedding for generating a similarity matrix for assigning weights to different     samples during training. Finally, It contains a call to classification pipeline that trains and evaluates different sampling strategies.
   
                 
   
